@@ -22,7 +22,7 @@ jobs:
 
     steps:
       - name: Check out branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           persist-credentials: true
           repository: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.repo.full_name || github.repository }}
