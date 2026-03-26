@@ -1,0 +1,5 @@
+[submodule "Vendor/ghostty-upstream"]
+	path = Vendor/ghostty-upstream
+	url = https://github.com/ghostty-org/ghostty.git
+	branch = main
+	ignore = dirty

@@ -1,0 +1,4 @@
+module CGhosttyKitBinary {
+    header "ghostty.h"
+    export *
+}

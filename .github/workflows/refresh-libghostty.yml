@@ -1,0 +1,71 @@
+name: Refresh libghostty
+
+on:
+  pull_request_target:
+    types:
+      - opened
+      - reopened
+      - synchronize
+    paths:
+      - .gitmodules
+      - Vendor/ghostty-upstream
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  refresh:
+    if: github.event_name == 'workflow_dispatch' || github.actor == 'dependabot[bot]'
+    runs-on: macos-15
+
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+          repository: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.ref || github.ref_name }}
+          submodules: recursive
+
+      - name: Verify runner architecture
+        run: test "$(uname -m)" = "arm64"
+
+      - name: Install Zig required by upstream Ghostty
+        run: |
+          zig_version="$(sed -n 's/.*minimum_zig_version = "\(.*\)".*/\1/p' Vendor/ghostty-upstream/build.zig.zon | head -n 1)"
+          if [[ -z "$zig_version" ]]; then
+            echo "Unable to determine Ghostty's required Zig version." >&2
+            exit 1
+          fi
+
+          case "$(uname -m)" in
+            arm64) zig_arch="aarch64" ;;
+            x86_64) zig_arch="x86_64" ;;
+            *)
+              echo "Unsupported runner architecture: $(uname -m)" >&2
+              exit 1
+              ;;
+          esac
+
+          tmpdir="$(mktemp -d)"
+          curl -fsSL "https://ziglang.org/download/${zig_version}/zig-macos-${zig_arch}-${zig_version}.tar.xz" | tar -xJ -C "$tmpdir"
+          echo "$tmpdir/zig-macos-${zig_arch}-${zig_version}" >> "$GITHUB_PATH"
+
+      - name: Regenerate vendored libghostty
+        run: ./Scripts/update-libghostty.sh
+
+      - name: Commit regenerated artifacts
+        run: |
+          git add Sources/GhosttyKit/include Vendor/GhosttyKit.xcframework.zip Vendor/GhosttyKit.checksum Vendor/libghostty.version
+
+          if git diff --cached --quiet; then
+            echo "No regenerated artifact changes to commit."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "build: refresh vendored libghostty"
+          git push

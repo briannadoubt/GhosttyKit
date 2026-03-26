@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  build-and-test:
+    runs-on: macos-15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Verify runner architecture
+        run: test "$(uname -m)" = "arm64"
+
+      - name: Unpack tracked XCFramework archive
+        run: ./Scripts/unpack-artifact.sh
+
+      - name: Verify package is publishable
+        run: |
+          if swift package dump-package | grep -q '"unsafeFlags"'; then
+            echo "Package.swift still uses unsafe build flags." >&2
+            exit 1
+          fi
+
+      - name: Verify vendored libghostty metadata
+        run: ./Scripts/check-libghostty-sync.sh
+
+      - name: Build package
+        run: swift build
+
+      - name: Run tests
+        run: swift test
