@@ -59,7 +59,9 @@ fi
 repo_root="$(git rev-parse --show-toplevel)"
 submodule_path="$repo_root/Vendor/ghostty-upstream"
 vendor_path="$repo_root/Vendor/GhosttyKit.xcframework"
+static_library_path="$repo_root/Vendor/GhosttyKitStatic/macos-arm64"
 headers_path="$repo_root/Sources/GhosttyKit/include"
+shim_path="$repo_root/Sources/CGhosttyKitBinary"
 version_file="$repo_root/Vendor/libghostty.version"
 
 git -C "$repo_root" submodule update --init --recursive Vendor/ghostty-upstream
@@ -120,6 +122,10 @@ git -C "$workdir/ghostty" checkout --quiet --detach "$upstream_commit"
 
 rsync -a --delete "$workdir/ghostty/macos/GhosttyKit.xcframework/" "$vendor_path/"
 rsync -a --delete "$workdir/ghostty/include/" "$headers_path/"
+mkdir -p "$static_library_path" "$shim_path"
+cp "$workdir/ghostty/macos/GhosttyKit.xcframework/macos-arm64/libghostty-fat.a" "$static_library_path/libghostty-fat.a"
+find "$vendor_path" "$static_library_path" -name 'libghostty-fat.a' -exec strip -S {} \;
+rsync -a --delete --exclude 'module.modulemap' "$vendor_path/macos-arm64/Headers/" "$shim_path/"
 
 cat >"$vendor_path/macos-arm64/Headers/module.modulemap" <<'EOF'
 module CGhosttyKitBinary {
@@ -133,6 +139,17 @@ module CGhosttyKitBinary {
     header "ghostty.h"
     export *
 }
+EOF
+
+cat >"$shim_path/module.modulemap" <<'EOF'
+module CGhosttyKitBinary {
+    header "ghostty.h"
+    export *
+}
+EOF
+
+cat >"$shim_path/stub.c" <<'EOF'
+#include "ghostty.h"
 EOF
 
 cat >"$version_file" <<EOF
