@@ -16,12 +16,9 @@ let localLibraryAbsolutePath = packageRoot
 
 let useLocalStaticBinary = ProcessInfo.processInfo.environment["GHOSTTYKIT_USE_LOCAL_STATIC"] == "1"
 
-let releaseTag = "0.1.2"
+let releaseTag = "0.1.3"
 let releaseArtifactURL = "https://raw.githubusercontent.com/briannadoubt/GhosttyKit/\(releaseTag)/Vendor/GhosttyKit.xcframework.zip"
-let releaseChecksum = try String(
-    contentsOf: packageRoot.appendingPathComponent("Vendor/GhosttyKit.checksum"),
-    encoding: .utf8
-).trimmingCharacters(in: .whitespacesAndNewlines)
+let releaseChecksum = "2924a77eeeb433bfa411fc71aae34bbd7b0079f30ad157e2ab42395782276726"
 
 let binaryTarget: Target = if useLocalStaticBinary && FileManager.default.fileExists(atPath: localLibraryAbsolutePath) {
     .target(

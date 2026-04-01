@@ -13,7 +13,7 @@ The vendored binary and header mirror come from
 After the initial tag is published:
 
 ```swift
-.package(url: "https://github.com/briannadoubt/GhosttyKit.git", from: "0.1.2")
+.package(url: "https://github.com/briannadoubt/GhosttyKit.git", from: "0.1.3")
 ```
 
 Then depend on the `GhosttyKit` product from your target.
