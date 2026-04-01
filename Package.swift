@@ -1,14 +1,6 @@
 // swift-tools-version: 6.0
 
-import Foundation
 import PackageDescription
-
-let packageRoot = URL(fileURLWithPath: #filePath)
-    .deletingLastPathComponent()
-
-let localLibraryDirectoryAbsolutePath = packageRoot
-    .appendingPathComponent("Vendor/GhosttyKitStatic/macos-arm64")
-    .path
 
 let package = Package(
     name: "GhosttyKit",
@@ -22,16 +14,17 @@ let package = Package(
         )
     ],
     targets: [
+        .binaryTarget(
+            name: "GhosttyKitBinary",
+            path: "Vendor/GhosttyKit.xcframework"
+        ),
         .target(
             name: "CGhosttyKitBinary",
+            dependencies: [
+                "GhosttyKitBinary",
+            ],
             path: "Sources/CGhosttyKitBinary",
-            publicHeadersPath: ".",
-            linkerSettings: [
-                .unsafeFlags([
-                    "-L", localLibraryDirectoryAbsolutePath,
-                    "-lghostty-fat",
-                ])
-            ]
+            publicHeadersPath: "."
         ),
         .target(
             name: "GhosttyKit",
