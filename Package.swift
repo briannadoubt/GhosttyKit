@@ -6,39 +6,9 @@ import PackageDescription
 let packageRoot = URL(fileURLWithPath: #filePath)
     .deletingLastPathComponent()
 
-let localLibraryDirectoryPath = "Vendor/GhosttyKitStatic/macos-arm64"
 let localLibraryDirectoryAbsolutePath = packageRoot
-    .appendingPathComponent(localLibraryDirectoryPath)
+    .appendingPathComponent("Vendor/GhosttyKitStatic/macos-arm64")
     .path
-let localLibraryAbsolutePath = packageRoot
-    .appendingPathComponent("\(localLibraryDirectoryPath)/libghostty-fat.a")
-    .path
-
-let useLocalStaticBinary = ProcessInfo.processInfo.environment["GHOSTTYKIT_USE_LOCAL_STATIC"] == "1"
-
-let releaseTag = "0.1.3"
-let releaseArtifactURL = "https://raw.githubusercontent.com/briannadoubt/GhosttyKit/\(releaseTag)/Vendor/GhosttyKit.xcframework.zip"
-let releaseChecksum = "2924a77eeeb433bfa411fc71aae34bbd7b0079f30ad157e2ab42395782276726"
-
-let binaryTarget: Target = if useLocalStaticBinary && FileManager.default.fileExists(atPath: localLibraryAbsolutePath) {
-    .target(
-        name: "CGhosttyKitBinary",
-        path: "Sources/CGhosttyKitBinary",
-        publicHeadersPath: ".",
-        linkerSettings: [
-            .unsafeFlags([
-                "-L", localLibraryDirectoryAbsolutePath,
-                "-lghostty-fat",
-            ])
-        ]
-    )
-} else {
-    .binaryTarget(
-        name: "CGhosttyKitBinary",
-        url: releaseArtifactURL,
-        checksum: releaseChecksum
-    )
-}
 
 let package = Package(
     name: "GhosttyKit",
@@ -52,7 +22,17 @@ let package = Package(
         )
     ],
     targets: [
-        binaryTarget,
+        .target(
+            name: "CGhosttyKitBinary",
+            path: "Sources/CGhosttyKitBinary",
+            publicHeadersPath: ".",
+            linkerSettings: [
+                .unsafeFlags([
+                    "-L", localLibraryDirectoryAbsolutePath,
+                    "-lghostty-fat",
+                ])
+            ]
+        ),
         .target(
             name: "GhosttyKit",
             dependencies: [
