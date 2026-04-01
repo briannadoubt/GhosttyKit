@@ -3,9 +3,9 @@
 Swift Package Manager wrapper around the upstream `libghostty` macOS XCFramework.
 
 `GhosttyKit` publishes a normal Swift package product that client apps can
-import directly. The repo tracks a zipped `GhosttyKit.xcframework` artifact for
-distribution and keeps an unzipped local XCFramework only for maintainer builds.
-The vendored binary and header mirror come from
+import directly. The repo tracks a checked-in framework-style
+`GhosttyKit.xcframework` that SwiftPM consumes from the package checkout, plus
+a zipped copy for release packaging. The vendored binary and header mirror come from
 [`ghostty-org/ghostty`](https://github.com/ghostty-org/ghostty).
 
 ## Install
@@ -21,20 +21,9 @@ Then depend on the `GhosttyKit` product from your target.
 This package currently ships a macOS arm64 binary built with a minimum deployment
 target of macOS 13.
 
-By default, published builds resolve the zipped `GhosttyKit.xcframework` artifact
-from the tagged repository contents, so downstream packages can depend on
-`GhosttyKit` without unsafe build flags.
-
-## Maintainer Local Static Mode
-
-Maintainers can opt into the tracked flat static library and header shim when
-they need to iterate on the package locally:
-
-```sh
-GHOSTTYKIT_USE_LOCAL_STATIC=1 swift build
-```
-
-That mode uses `Vendor/GhosttyKitStatic` plus `Sources/CGhosttyKitBinary`.
+Downstream packages resolve the checked-in `Vendor/GhosttyKit.xcframework`
+through a local SwiftPM binary target, so the package stays consumable without
+unsafe build flags or remote artifact indirection.
 
 ## Updating libghostty
 
@@ -56,7 +45,7 @@ To pin a specific upstream ref first:
 ```
 
 The script rebuilds `GhosttyKit.xcframework`, syncs the public headers, refreshes
-the local static-library fallback files, and records the exact upstream commit in
+the local static library mirror, and records the exact upstream commit in
 `Vendor/libghostty.version`.
 
 To refresh the tracked distribution archive without rebuilding:

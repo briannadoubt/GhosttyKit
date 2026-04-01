@@ -120,19 +120,11 @@ git -C "$workdir/ghostty" checkout --quiet --detach "$upstream_commit"
     -Dxcframework-target=native
 )
 
-rsync -a --delete "$workdir/ghostty/macos/GhosttyKit.xcframework/" "$vendor_path/"
 rsync -a --delete "$workdir/ghostty/include/" "$headers_path/"
 mkdir -p "$static_library_path" "$shim_path"
 cp "$workdir/ghostty/macos/GhosttyKit.xcframework/macos-arm64/libghostty-fat.a" "$static_library_path/libghostty-fat.a"
-find "$vendor_path" "$static_library_path" -name 'libghostty-fat.a' -exec strip -S {} \;
-rsync -a --delete --exclude 'module.modulemap' "$vendor_path/macos-arm64/Headers/" "$shim_path/"
-
-cat >"$vendor_path/macos-arm64/Headers/module.modulemap" <<'EOF'
-module CGhosttyKitBinary {
-    header "ghostty.h"
-    export *
-}
-EOF
+strip -S "$static_library_path/libghostty-fat.a"
+rsync -a --delete --exclude 'module.modulemap' "$headers_path/" "$shim_path/"
 
 cat >"$headers_path/module.modulemap" <<'EOF'
 module CGhosttyKitBinary {
@@ -151,6 +143,8 @@ EOF
 cat >"$shim_path/stub.c" <<'EOF'
 #include "ghostty.h"
 EOF
+
+"$repo_root/Scripts/rebuild-xcframework.sh"
 
 cat >"$version_file" <<EOF
 ghostty_ref=$upstream_ref

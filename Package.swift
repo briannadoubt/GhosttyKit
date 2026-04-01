@@ -15,16 +15,8 @@ let package = Package(
     ],
     targets: [
         .binaryTarget(
-            name: "GhosttyKitBinary",
-            path: "Vendor/GhosttyKit.xcframework"
-        ),
-        .target(
             name: "CGhosttyKitBinary",
-            dependencies: [
-                "GhosttyKitBinary",
-            ],
-            path: "Sources/CGhosttyKitBinary",
-            publicHeadersPath: "."
+            path: "Vendor/GhosttyKit.xcframework"
         ),
         .target(
             name: "GhosttyKit",
