@@ -34,4 +34,4 @@ case "$tarball_url" in
     ;;
 esac
 
-curl -fsI "$tarball_url" >/dev/null
+curl -fsSL --range 0-0 "$tarball_url" >/dev/null
