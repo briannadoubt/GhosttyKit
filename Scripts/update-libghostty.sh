@@ -117,6 +117,7 @@ git -C "$workdir/ghostty" checkout --quiet --detach "$upstream_commit"
   zig build \
     -Doptimize=ReleaseFast \
     -Demit-xcframework=true \
+    -Demit-macos-app=false \
     -Dxcframework-target=native
 )
 
