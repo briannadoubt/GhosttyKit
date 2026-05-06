@@ -123,7 +123,7 @@ git -C "$workdir/ghostty" checkout --quiet --detach "$upstream_commit"
 
 rsync -a --delete "$workdir/ghostty/include/" "$headers_path/"
 mkdir -p "$static_library_path" "$shim_path"
-cp "$workdir/ghostty/macos/GhosttyKit.xcframework/macos-arm64/libghostty-fat.a" "$static_library_path/libghostty-fat.a"
+cp "$("$repo_root/Scripts/find-ghosttykit-static-library.sh" "$workdir/ghostty/macos/GhosttyKit.xcframework")" "$static_library_path/libghostty-fat.a"
 strip -S "$static_library_path/libghostty-fat.a"
 rsync -a --delete --exclude 'module.modulemap' "$headers_path/" "$shim_path/"
 
