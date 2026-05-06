@@ -19,6 +19,7 @@ jobs:
 
       - name: Test CI helper scripts
         run: |
+          bash Tests/Scripts/find-ghosttykit-static-library-test.sh
           bash Tests/Scripts/install-zig-from-ghostty-test.sh
           bash Tests/Scripts/update-libghostty-test.sh
 
