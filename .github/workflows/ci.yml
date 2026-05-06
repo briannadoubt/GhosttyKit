@@ -17,6 +17,9 @@ jobs:
       - name: Verify runner architecture
         run: test "$(uname -m)" = "arm64"
 
+      - name: Test CI helper scripts
+        run: bash Tests/Scripts/install-zig-from-ghostty-test.sh
+
       - name: Unpack tracked XCFramework archive
         run: ./Scripts/unpack-artifact.sh
 
