@@ -16,6 +16,7 @@
 #include <ghostty/vt/modes.h>
 #include <ghostty/vt/size_report.h>
 #include <ghostty/vt/grid_ref.h>
+#include <ghostty/vt/kitty_graphics.h>
 #include <ghostty/vt/screen.h>
 #include <ghostty/vt/point.h>
 #include <ghostty/vt/style.h>
@@ -33,6 +34,10 @@ extern "C" {
  *
  * Once a terminal session is up and running, you can configure a key encoder
  * to write keyboard input via ghostty_key_encoder_setopt_from_terminal().
+ *
+ * ### Example: VT stream processing
+ * @snippet c-vt-stream/src/main.c vt-stream-init
+ * @snippet c-vt-stream/src/main.c vt-stream-write
  *
  * ## Effects
  *
@@ -88,15 +93,67 @@ extern "C" {
  * ### Registering effects and processing VT data
  * @snippet c-vt-effects/src/main.c effects-register
  *
+ * ## Color Theme
+ *
+ * The terminal maintains a set of colors used for rendering: a foreground
+ * color, a background color, a cursor color, and a 256-color palette. Each
+ * of these has two layers: a **default** value set by the embedder, and an
+ * **override** value that programs running in the terminal can set via OSC
+ * escape sequences (e.g. OSC 10/11/12 for foreground/background/cursor,
+ * OSC 4 for individual palette entries).
+ *
+ * ### Default Colors
+ *
+ * Use ghostty_terminal_set() with the color options to configure the
+ * default colors. These represent the theme or configuration chosen by
+ * the embedder. Passing `NULL` clears the default, leaving the color
+ * unset.
+ *
+ * | Option                                  | Input Type              | Description                          |
+ * |-----------------------------------------|-------------------------|--------------------------------------|
+ * | `GHOSTTY_TERMINAL_OPT_COLOR_FOREGROUND` | `GhosttyColorRgb*`      | Default foreground color             |
+ * | `GHOSTTY_TERMINAL_OPT_COLOR_BACKGROUND` | `GhosttyColorRgb*`      | Default background color             |
+ * | `GHOSTTY_TERMINAL_OPT_COLOR_CURSOR`     | `GhosttyColorRgb*`      | Default cursor color                 |
+ * | `GHOSTTY_TERMINAL_OPT_COLOR_PALETTE`    | `GhosttyColorRgb[256]*` | Default 256-color palette            |
+ *
+ * For the palette, passing `NULL` resets to the built-in default palette.
+ * The palette set operation preserves any per-index OSC overrides that
+ * programs have applied; only unmodified indices are updated.
+ *
+ * ### Reading colors
+ *
+ * Use ghostty_terminal_get() to read colors. There are two variants for
+ * each color: the **effective** value (which returns the OSC override if
+ * one is active, otherwise the default) and the **default** value (which
+ * ignores any OSC overrides).
+ *
+ * | Data                                              | Output Type             | Description                                    |
+ * |---------------------------------------------------|-------------------------|------------------------------------------------|
+ * | `GHOSTTY_TERMINAL_DATA_COLOR_FOREGROUND`          | `GhosttyColorRgb*`      | Effective foreground (override or default)      |
+ * | `GHOSTTY_TERMINAL_DATA_COLOR_BACKGROUND`          | `GhosttyColorRgb*`      | Effective background (override or default)      |
+ * | `GHOSTTY_TERMINAL_DATA_COLOR_CURSOR`              | `GhosttyColorRgb*`      | Effective cursor (override or default)          |
+ * | `GHOSTTY_TERMINAL_DATA_COLOR_PALETTE`             | `GhosttyColorRgb[256]*` | Current palette (with any OSC overrides)        |
+ * | `GHOSTTY_TERMINAL_DATA_COLOR_FOREGROUND_DEFAULT`  | `GhosttyColorRgb*`      | Default foreground only (ignores OSC override)  |
+ * | `GHOSTTY_TERMINAL_DATA_COLOR_BACKGROUND_DEFAULT`  | `GhosttyColorRgb*`      | Default background only (ignores OSC override)  |
+ * | `GHOSTTY_TERMINAL_DATA_COLOR_CURSOR_DEFAULT`      | `GhosttyColorRgb*`      | Default cursor only (ignores OSC override)      |
+ * | `GHOSTTY_TERMINAL_DATA_COLOR_PALETTE_DEFAULT`     | `GhosttyColorRgb[256]*` | Default palette only (ignores OSC overrides)    |
+ *
+ * For foreground, background, and cursor colors, the getters return
+ * `GHOSTTY_NO_VALUE` if no color is configured (neither a default nor an
+ * OSC override). The palette getters always succeed since the palette
+ * always has a value (the built-in default if nothing else is set).
+ *
+ * ### Setting a color theme
+ * @snippet c-vt-colors/src/main.c colors-set-defaults
+ *
+ * ### Reading effective and default colors
+ * @snippet c-vt-colors/src/main.c colors-read
+ *
+ * ### Full example with OSC overrides
+ * @snippet c-vt-colors/src/main.c colors-main
+ *
  * @{
  */
-
-/**
- * Opaque handle to a terminal instance.
- *
- * @ingroup terminal
- */
-typedef struct GhosttyTerminal* GhosttyTerminal;
 
 /**
  * Terminal initialization options.
@@ -123,7 +180,7 @@ typedef struct {
  *
  * @ingroup terminal
  */
-typedef enum {
+typedef enum GHOSTTY_ENUM_TYPED {
   /** Scroll to the top of the scrollback. */
   GHOSTTY_SCROLL_VIEWPORT_TOP,
 
@@ -132,6 +189,7 @@ typedef enum {
 
   /** Scroll by a delta amount (up is negative). */
   GHOSTTY_SCROLL_VIEWPORT_DELTA,
+  GHOSTTY_SCROLL_VIEWPORT_MAX_VALUE = GHOSTTY_ENUM_MAX_VALUE,
 } GhosttyTerminalScrollViewportTag;
 
 /**
@@ -164,12 +222,13 @@ typedef struct {
  *
  * @ingroup terminal
  */
-typedef enum {
+typedef enum GHOSTTY_ENUM_TYPED {
   /** The primary (normal) screen. */
   GHOSTTY_TERMINAL_SCREEN_PRIMARY = 0,
 
   /** The alternate screen. */
   GHOSTTY_TERMINAL_SCREEN_ALTERNATE = 1,
+  GHOSTTY_TERMINAL_SCREEN_MAX_VALUE = GHOSTTY_ENUM_MAX_VALUE,
 } GhosttyTerminalScreen;
 
 /**
@@ -337,7 +396,7 @@ typedef GhosttyString (*GhosttyTerminalXtversionFn)(GhosttyTerminal terminal,
  *
  * @ingroup terminal
  */
-typedef enum {
+typedef enum GHOSTTY_ENUM_TYPED {
   /**
    * Opaque userdata pointer passed to all callbacks.
    *
@@ -434,6 +493,106 @@ typedef enum {
    * Input type: GhosttyString*
    */
   GHOSTTY_TERMINAL_OPT_PWD = 10,
+
+  /**
+   * Set the default foreground color.
+   *
+   * A NULL value pointer clears the default (unset).
+   *
+   * Input type: GhosttyColorRgb*
+   */
+  GHOSTTY_TERMINAL_OPT_COLOR_FOREGROUND = 11,
+
+  /**
+   * Set the default background color.
+   *
+   * A NULL value pointer clears the default (unset).
+   *
+   * Input type: GhosttyColorRgb*
+   */
+  GHOSTTY_TERMINAL_OPT_COLOR_BACKGROUND = 12,
+
+  /**
+   * Set the default cursor color.
+   *
+   * A NULL value pointer clears the default (unset).
+   *
+   * Input type: GhosttyColorRgb*
+   */
+  GHOSTTY_TERMINAL_OPT_COLOR_CURSOR = 13,
+
+  /**
+   * Set the default 256-color palette.
+   *
+   * The value must point to an array of exactly 256 GhosttyColorRgb values.
+   * A NULL value pointer resets to the built-in default palette.
+   *
+   * Input type: GhosttyColorRgb[256]*
+   */
+  GHOSTTY_TERMINAL_OPT_COLOR_PALETTE = 14,
+
+  /**
+   * Set the Kitty image storage limit in bytes.
+   *
+   * Applied to all initialized screens (primary and alternate).
+   * A value of zero disables the Kitty graphics protocol entirely,
+   * deleting all stored images and placements. A NULL value pointer
+   * is equivalent to zero (disables). Has no effect when Kitty graphics
+   * are disabled at build time.
+   *
+   * Input type: uint64_t*
+   */
+  GHOSTTY_TERMINAL_OPT_KITTY_IMAGE_STORAGE_LIMIT = 15,
+
+  /**
+   * Enable or disable Kitty image loading via the file medium.
+   *
+   * A NULL value pointer is a no-op. Has no effect when Kitty graphics
+   * are disabled at build time.
+   *
+   * Input type: bool*
+   */
+  GHOSTTY_TERMINAL_OPT_KITTY_IMAGE_MEDIUM_FILE = 16,
+
+  /**
+   * Enable or disable Kitty image loading via the temporary file medium.
+   *
+   * A NULL value pointer is a no-op. Has no effect when Kitty graphics
+   * are disabled at build time.
+   *
+   * Input type: bool*
+   */
+  GHOSTTY_TERMINAL_OPT_KITTY_IMAGE_MEDIUM_TEMP_FILE = 17,
+
+  /**
+   * Enable or disable Kitty image loading via the shared memory medium.
+   *
+   * A NULL value pointer is a no-op. Has no effect when Kitty graphics
+   * are disabled at build time.
+   *
+   * Input type: bool*
+   */
+  GHOSTTY_TERMINAL_OPT_KITTY_IMAGE_MEDIUM_SHARED_MEM = 18,
+
+  /**
+   * Set the maximum bytes the APC handler will buffer for all protocols.
+   * This prevents malicious input from causing unbounded memory allocation.
+   * A NULL value pointer removes all overrides, reverting to the built-in
+   * defaults.
+   *
+   * Input type: size_t*
+   */
+  GHOSTTY_TERMINAL_OPT_APC_MAX_BYTES = 19,
+
+  /**
+   * Set the maximum bytes the APC handler will buffer for Kitty graphics
+   * protocol data. A NULL value pointer removes the override, reverting
+   * to the built-in default.
+   *
+   * Input type: size_t*
+   */
+  GHOSTTY_TERMINAL_OPT_APC_MAX_BYTES_KITTY = 20,
+  GHOSTTY_TERMINAL_OPT_MAX_VALUE = GHOSTTY_ENUM_MAX_VALUE,
 } GhosttyTerminalOption;
 
 /**
@@ -444,7 +603,7 @@ typedef enum {
  *
  * @ingroup terminal
  */
-typedef enum {
+typedef enum GHOSTTY_ENUM_TYPED {
   /** Invalid data type. Never results in any data extraction. */
   GHOSTTY_TERMINAL_DATA_INVALID = 0,
 
@@ -588,6 +747,128 @@ typedef enum {
    * Output type: uint32_t *
    */
   GHOSTTY_TERMINAL_DATA_HEIGHT_PX = 17,
+
+  /**
+   * The effective foreground color (override or default).
+   *
+   * Returns GHOSTTY_NO_VALUE if no foreground color is set.
+   *
+   * Output type: GhosttyColorRgb *
+   */
+  GHOSTTY_TERMINAL_DATA_COLOR_FOREGROUND = 18,
+
+  /**
+   * The effective background color (override or default).
+   *
+   * Returns GHOSTTY_NO_VALUE if no background color is set.
+   *
+   * Output type: GhosttyColorRgb *
+   */
+  GHOSTTY_TERMINAL_DATA_COLOR_BACKGROUND = 19,
+
+  /**
+   * The effective cursor color (override or default).
+   *
+   * Returns GHOSTTY_NO_VALUE if no cursor color is set.
+   *
+   * Output type: GhosttyColorRgb *
+   */
+  GHOSTTY_TERMINAL_DATA_COLOR_CURSOR = 20,
+
+  /**
+   * The current 256-color palette.
+   *
+   * Output type: GhosttyColorRgb[256] *
+   */
+  GHOSTTY_TERMINAL_DATA_COLOR_PALETTE = 21,
+
+  /**
+   * The default foreground color (ignoring any OSC override).
+   *
+   * Returns GHOSTTY_NO_VALUE if no default foreground color is set.
+   *
+   * Output type: GhosttyColorRgb *
+   */
+  GHOSTTY_TERMINAL_DATA_COLOR_FOREGROUND_DEFAULT = 22,
+
+  /**
+   * The default background color (ignoring any OSC override).
+   *
+   * Returns GHOSTTY_NO_VALUE if no default background color is set.
+   *
+   * Output type: GhosttyColorRgb *
+   */
+  GHOSTTY_TERMINAL_DATA_COLOR_BACKGROUND_DEFAULT = 23,
+
+  /**
+   * The default cursor color (ignoring any OSC override).
+   *
+   * Returns GHOSTTY_NO_VALUE if no default cursor color is set.
+   *
+   * Output type: GhosttyColorRgb *
+   */
+  GHOSTTY_TERMINAL_DATA_COLOR_CURSOR_DEFAULT = 24,
+
+  /**
+   * The default 256-color palette (ignoring any OSC overrides).
+   *
+   * Output type: GhosttyColorRgb[256] *
+   */
+  GHOSTTY_TERMINAL_DATA_COLOR_PALETTE_DEFAULT = 25,
+
+  /**
+   * The Kitty image storage limit in bytes for the active screen.
+   *
+   * A value of zero means the Kitty graphics protocol is disabled.
+   * Returns GHOSTTY_NO_VALUE when Kitty graphics are disabled at build time.
+   *
+   * Output type: uint64_t *
+   */
+  GHOSTTY_TERMINAL_DATA_KITTY_IMAGE_STORAGE_LIMIT = 26,
+
+  /**
+   * Whether the file medium is enabled for Kitty image loading on the
+   * active screen.
+   *
+   * Returns GHOSTTY_NO_VALUE when Kitty graphics are disabled at build time.
+   *
+   * Output type: bool *
+   */
+  GHOSTTY_TERMINAL_DATA_KITTY_IMAGE_MEDIUM_FILE = 27,
+
+  /**
+   * Whether the temporary file medium is enabled for Kitty image loading
+   * on the active screen.
+   *
+   * Returns GHOSTTY_NO_VALUE when Kitty graphics are disabled at build time.
+   *
+   * Output type: bool *
+   */
+  GHOSTTY_TERMINAL_DATA_KITTY_IMAGE_MEDIUM_TEMP_FILE = 28,
+
+  /**
+   * Whether the shared memory medium is enabled for Kitty image loading
+   * on the active screen.
+   *
+   * Returns GHOSTTY_NO_VALUE when Kitty graphics are disabled at build time.
+   *
+   * Output type: bool *
+   */
+  GHOSTTY_TERMINAL_DATA_KITTY_IMAGE_MEDIUM_SHARED_MEM = 29,
+
+  /**
+   * The Kitty graphics image storage for the active screen.
+   *
+   * Returns a borrowed pointer to the image storage. The pointer is valid
+   * until the next mutating terminal call (e.g. ghostty_terminal_vt_write()
+   * or ghostty_terminal_reset()).
+   *
+   * Returns GHOSTTY_NO_VALUE when Kitty graphics are disabled at build time.
+   *
+   * Output type: GhosttyKittyGraphics *
+   */
+  GHOSTTY_TERMINAL_DATA_KITTY_GRAPHICS = 30,
+  GHOSTTY_TERMINAL_DATA_MAX_VALUE = GHOSTTY_ENUM_MAX_VALUE,
 } GhosttyTerminalData;
 
 /**
@@ -600,7 +881,7 @@ typedef enum {
  *
  * @ingroup terminal
  */
-GhosttyResult ghostty_terminal_new(const GhosttyAllocator* allocator,
+GHOSTTY_API GhosttyResult ghostty_terminal_new(const GhosttyAllocator* allocator,
                                    GhosttyTerminal* terminal,
                                    GhosttyTerminalOptions options);
 
@@ -614,7 +895,7 @@ GhosttyResult ghostty_terminal_new(const GhosttyAllocator* allocator,
  *
  * @ingroup terminal
  */
-void ghostty_terminal_free(GhosttyTerminal terminal);
+GHOSTTY_API void ghostty_terminal_free(GhosttyTerminal terminal);
 
 /**
  * Perform a full reset of the terminal (RIS).
@@ -627,7 +908,7 @@ void ghostty_terminal_free(GhosttyTerminal terminal);
  *
  * @ingroup terminal
  */
-void ghostty_terminal_reset(GhosttyTerminal terminal);
+GHOSTTY_API void ghostty_terminal_reset(GhosttyTerminal terminal);
 
 /**
  * Resize the terminal to the given dimensions.
@@ -650,7 +931,7 @@ void ghostty_terminal_reset(GhosttyTerminal terminal);
  *
  * @ingroup terminal
  */
-GhosttyResult ghostty_terminal_resize(GhosttyTerminal terminal,
+GHOSTTY_API GhosttyResult ghostty_terminal_resize(GhosttyTerminal terminal,
                                       uint16_t cols,
                                       uint16_t rows,
                                       uint32_t cell_width_px,
@@ -676,7 +957,7 @@ GhosttyResult ghostty_terminal_resize(GhosttyTerminal terminal,
  *
  * @ingroup terminal
  */
-GhosttyResult ghostty_terminal_set(GhosttyTerminal terminal,
+GHOSTTY_API GhosttyResult ghostty_terminal_set(GhosttyTerminal terminal,
                                    GhosttyTerminalOption option,
                                    const void* value);
 
@@ -701,7 +982,7 @@ GhosttyResult ghostty_terminal_set(GhosttyTerminal terminal,
  *
  * @ingroup terminal
  */
-void ghostty_terminal_vt_write(GhosttyTerminal terminal,
+GHOSTTY_API void ghostty_terminal_vt_write(GhosttyTerminal terminal,
                                 const uint8_t* data,
                                 size_t len);
 
@@ -718,7 +999,7 @@ void ghostty_terminal_vt_write(GhosttyTerminal terminal,
  *
  * @ingroup terminal
  */
-void ghostty_terminal_scroll_viewport(GhosttyTerminal terminal,
+GHOSTTY_API void ghostty_terminal_scroll_viewport(GhosttyTerminal terminal,
                                        GhosttyTerminalScrollViewport behavior);
 
 /**
@@ -735,7 +1016,7 @@ void ghostty_terminal_scroll_viewport(GhosttyTerminal terminal,
  *
  * @ingroup terminal
  */
-GhosttyResult ghostty_terminal_mode_get(GhosttyTerminal terminal,
+GHOSTTY_API GhosttyResult ghostty_terminal_mode_get(GhosttyTerminal terminal,
                                         GhosttyMode mode,
                                         bool* out_value);
 
@@ -752,7 +1033,7 @@ GhosttyResult ghostty_terminal_mode_get(GhosttyTerminal terminal,
  *
  * @ingroup terminal
  */
-GhosttyResult ghostty_terminal_mode_set(GhosttyTerminal terminal,
+GHOSTTY_API GhosttyResult ghostty_terminal_mode_set(GhosttyTerminal terminal,
                                          GhosttyMode mode,
                                          bool value);
 
@@ -772,9 +1053,42 @@ GhosttyResult ghostty_terminal_mode_set(GhosttyTerminal terminal,
  *
  * @ingroup terminal
  */
-GhosttyResult ghostty_terminal_get(GhosttyTerminal terminal,
+GHOSTTY_API GhosttyResult ghostty_terminal_get(GhosttyTerminal terminal,
                                     GhosttyTerminalData data,
                                     void *out);
+
+/**
+ * Get multiple data fields from a terminal in a single call.
+ *
+ * This is an optimization over calling ghostty_terminal_get()
+ * repeatedly, particularly useful in environments with high per-call
+ * overhead such as FFI or Cgo.
+ *
+ * Each element in the keys array specifies a data kind, and the
+ * corresponding element in the values array receives the result.
+ * The type of each values[i] pointer must match the output type
+ * documented for keys[i].
+ *
+ * Processing stops at the first error; on success out_written
+ * is set to count, on error it is set to the index of the
+ * failing key (i.e. the number of values successfully written).
+ *
+ * @param terminal The terminal handle (may be NULL)
+ * @param count Number of key/value pairs
+ * @param keys Array of data kinds to query
+ * @param values Array of output pointers (types must match each key's
+ *               documented output type)
+ * @param[out] out_written On return, receives the number of values
+ *             successfully written (may be NULL)
+ * @return GHOSTTY_SUCCESS if all queries succeed
+ *
+ * @ingroup terminal
+ */
+GHOSTTY_API GhosttyResult ghostty_terminal_get_multi(GhosttyTerminal terminal,
+                                    size_t count,
+                                    const GhosttyTerminalData* keys,
+                                    void** values,
+                                    size_t* out_written);
 
 /**
  * Resolve a point in the terminal grid to a grid reference.
@@ -802,9 +1116,42 @@ GhosttyResult ghostty_terminal_get(GhosttyTerminal terminal,
  *
  * @ingroup terminal
  */
-GhosttyResult ghostty_terminal_grid_ref(GhosttyTerminal terminal,
+GHOSTTY_API GhosttyResult ghostty_terminal_grid_ref(GhosttyTerminal terminal,
                                         GhosttyPoint point,
                                         GhosttyGridRef *out_ref);
+
+/**
+ * Convert a grid reference back to a point in the given coordinate system.
+ *
+ * This is the inverse of ghostty_terminal_grid_ref(): given a grid reference,
+ * it returns the x/y coordinates in the requested coordinate system (active,
+ * viewport, screen, or history).
+ *
+ * The grid reference must have been obtained from the same terminal instance.
+ * Like all grid references, it is only valid until the next mutating terminal
+ * call.
+ *
+ * Not every grid reference is representable in every coordinate system. For
+ * example, a cell in scrollback history cannot be expressed in active
+ * coordinates, and a cell that has scrolled off the visible area cannot be
+ * expressed in viewport coordinates. In these cases, the function returns
+ * GHOSTTY_NO_VALUE.
+ *
+ * @param terminal The terminal handle (NULL returns GHOSTTY_INVALID_VALUE)
+ * @param ref Pointer to the grid reference to convert
+ * @param tag The target coordinate system
+ * @param[out] out On success, set to the coordinate in the requested system (may be NULL)
+ * @return GHOSTTY_SUCCESS on success, GHOSTTY_INVALID_VALUE if the terminal
+ *         or ref is NULL/invalid, GHOSTTY_NO_VALUE if the ref falls outside
+ *         the requested coordinate system
+ *
+ * @ingroup terminal
+ */
+GHOSTTY_API GhosttyResult ghostty_terminal_point_from_grid_ref(
+    GhosttyTerminal terminal,
+    const GhosttyGridRef *ref,
+    GhosttyPointTag tag,
+    GhosttyPointCoordinate *out);
 
 /** @} */
 
