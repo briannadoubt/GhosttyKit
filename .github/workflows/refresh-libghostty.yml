@@ -32,26 +32,18 @@ jobs:
       - name: Verify runner architecture
         run: test "$(uname -m)" = "arm64"
 
+      - name: Check out workflow helper scripts
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ github.event_name == 'pull_request_target' && github.base_ref || github.ref_name }}
+          path: .ghosttykit-tools
+          sparse-checkout: Scripts/install-zig-from-ghostty.sh
+          sparse-checkout-cone-mode: false
+          submodules: false
+
       - name: Install Zig required by upstream Ghostty
-        run: |
-          zig_version="$(sed -n 's/.*minimum_zig_version = "\(.*\)".*/\1/p' Vendor/ghostty-upstream/build.zig.zon | head -n 1)"
-          if [[ -z "$zig_version" ]]; then
-            echo "Unable to determine Ghostty's required Zig version." >&2
-            exit 1
-          fi
-
-          case "$(uname -m)" in
-            arm64) zig_arch="aarch64" ;;
-            x86_64) zig_arch="x86_64" ;;
-            *)
-              echo "Unsupported runner architecture: $(uname -m)" >&2
-              exit 1
-              ;;
-          esac
-
-          tmpdir="$(mktemp -d)"
-          curl -fsSL "https://ziglang.org/download/${zig_version}/zig-macos-${zig_arch}-${zig_version}.tar.xz" | tar -xJ -C "$tmpdir"
-          echo "$tmpdir/zig-macos-${zig_arch}-${zig_version}" >> "$GITHUB_PATH"
+        run: bash .ghosttykit-tools/Scripts/install-zig-from-ghostty.sh
 
       - name: Regenerate vendored libghostty
         run: ./Scripts/update-libghostty.sh
