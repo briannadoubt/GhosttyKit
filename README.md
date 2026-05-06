@@ -59,8 +59,8 @@ To refresh the tracked distribution archive without rebuilding:
 
 - CI validates the package builds and tests cleanly on macOS arm64 and checks
   that the repo is publishable without SwiftPM unsafe flags.
-- Dependabot watches both GitHub Actions and the `Vendor/ghostty-upstream`
-  submodule.
+- Dependabot checks both GitHub Actions and the `Vendor/ghostty-upstream`
+  submodule nightly.
 - A GitHub Actions workflow amends Dependabot submodule PRs by regenerating the
   zipped XCFramework, header mirror, and metadata so upstream `libghostty`
   changes arrive as a reviewable pull request instead of manual repo surgery.
