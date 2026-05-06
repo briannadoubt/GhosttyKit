@@ -82,32 +82,11 @@ extern "C" {
  */
 
 /**
- * Opaque handle to a render state instance.
- *
- * @ingroup render
- */
-typedef struct GhosttyRenderState* GhosttyRenderState;
-
-/**
- * Opaque handle to a render-state row iterator.
- *
- * @ingroup render
- */
-typedef struct GhosttyRenderStateRowIterator* GhosttyRenderStateRowIterator;
-
-/**
- * Opaque handle to render-state row cells.
- *
- * @ingroup render
- */
-typedef struct GhosttyRenderStateRowCells* GhosttyRenderStateRowCells;
-
-/**
  * Dirty state of a render state after update.
  *
  * @ingroup render
  */
-typedef enum {
+typedef enum GHOSTTY_ENUM_TYPED {
   /** Not dirty at all; rendering can be skipped. */
   GHOSTTY_RENDER_STATE_DIRTY_FALSE = 0,
 
@@ -116,6 +95,7 @@ typedef enum {
 
   /** Global state changed; renderer should redraw everything. */
   GHOSTTY_RENDER_STATE_DIRTY_FULL = 2,
+  GHOSTTY_RENDER_STATE_DIRTY_MAX_VALUE = GHOSTTY_ENUM_MAX_VALUE,
 } GhosttyRenderStateDirty;
 
 /**
@@ -123,7 +103,7 @@ typedef enum {
  *
  * @ingroup render
  */
-typedef enum {
+typedef enum GHOSTTY_ENUM_TYPED {
   /** Bar cursor (DECSCUSR 5, 6). */
   GHOSTTY_RENDER_STATE_CURSOR_VISUAL_STYLE_BAR = 0,
 
@@ -135,6 +115,7 @@ typedef enum {
 
   /** Hollow block cursor. */
   GHOSTTY_RENDER_STATE_CURSOR_VISUAL_STYLE_BLOCK_HOLLOW = 3,
+  GHOSTTY_RENDER_STATE_CURSOR_VISUAL_STYLE_MAX_VALUE = GHOSTTY_ENUM_MAX_VALUE,
 } GhosttyRenderStateCursorVisualStyle;
 
 /**
@@ -142,7 +123,7 @@ typedef enum {
  *
  * @ingroup render
  */
-typedef enum {
+typedef enum GHOSTTY_ENUM_TYPED {
   /** Invalid / sentinel value. */
   GHOSTTY_RENDER_STATE_DATA_INVALID = 0,
 
@@ -206,6 +187,7 @@ typedef enum {
   /** Whether the cursor is on the tail of a wide character (bool).
    *  Only valid when CURSOR_VIEWPORT_HAS_VALUE is true. */
   GHOSTTY_RENDER_STATE_DATA_CURSOR_VIEWPORT_WIDE_TAIL = 17,
+  GHOSTTY_RENDER_STATE_DATA_MAX_VALUE = GHOSTTY_ENUM_MAX_VALUE,
 } GhosttyRenderStateData;
 
 /**
@@ -213,9 +195,10 @@ typedef enum {
  *
  * @ingroup render
  */
-typedef enum {
+typedef enum GHOSTTY_ENUM_TYPED {
   /** Set dirty state (GhosttyRenderStateDirty). */
   GHOSTTY_RENDER_STATE_OPTION_DIRTY = 0,
+  GHOSTTY_RENDER_STATE_OPTION_MAX_VALUE = GHOSTTY_ENUM_MAX_VALUE,
 } GhosttyRenderStateOption;
 
 /**
@@ -223,7 +206,7 @@ typedef enum {
  *
  * @ingroup render
  */
-typedef enum {
+typedef enum GHOSTTY_ENUM_TYPED {
   /** Invalid / sentinel value. */
   GHOSTTY_RENDER_STATE_ROW_DATA_INVALID = 0,
 
@@ -238,6 +221,7 @@ typedef enum {
    *  valid as long as the underlying render state is not updated. 
    *  It is unsafe to use cell data after updating the render state. */
   GHOSTTY_RENDER_STATE_ROW_DATA_CELLS = 3,
+  GHOSTTY_RENDER_STATE_ROW_DATA_MAX_VALUE = GHOSTTY_ENUM_MAX_VALUE,
 } GhosttyRenderStateRowData;
 
 /**
@@ -245,9 +229,10 @@ typedef enum {
  *
  * @ingroup render
  */
-typedef enum {
+typedef enum GHOSTTY_ENUM_TYPED {
   /** Set dirty state for the current row (bool). */
   GHOSTTY_RENDER_STATE_ROW_OPTION_DIRTY = 0,
+  GHOSTTY_RENDER_STATE_ROW_OPTION_MAX_VALUE = GHOSTTY_ENUM_MAX_VALUE,
 } GhosttyRenderStateRowOption;
 
 /**
@@ -299,7 +284,7 @@ typedef struct {
  *
  * @ingroup render
  */
-GhosttyResult ghostty_render_state_new(const GhosttyAllocator* allocator,
+GHOSTTY_API GhosttyResult ghostty_render_state_new(const GhosttyAllocator* allocator,
                                        GhosttyRenderState* state);
 
 /**
@@ -312,7 +297,7 @@ GhosttyResult ghostty_render_state_new(const GhosttyAllocator* allocator,
  *
  * @ingroup render
  */
-void ghostty_render_state_free(GhosttyRenderState state);
+GHOSTTY_API void ghostty_render_state_free(GhosttyRenderState state);
 
 /**
  * Update a render state instance from a terminal.
@@ -328,7 +313,7 @@ void ghostty_render_state_free(GhosttyRenderState state);
  *
  * @ingroup render
  */
-GhosttyResult ghostty_render_state_update(GhosttyRenderState state,
+GHOSTTY_API GhosttyResult ghostty_render_state_update(GhosttyRenderState state,
                                           GhosttyTerminal terminal);
 
 /**
@@ -345,9 +330,37 @@ GhosttyResult ghostty_render_state_update(GhosttyRenderState state,
  *
  * @ingroup render
  */
-GhosttyResult ghostty_render_state_get(GhosttyRenderState state,
-                                       GhosttyRenderStateData data,
-                                       void* out);
+GHOSTTY_API GhosttyResult ghostty_render_state_get(GhosttyRenderState state,
+                                        GhosttyRenderStateData data,
+                                        void* out);
+
+/**
+ * Get multiple data fields from a render state in a single call.
+ *
+ * Each element in the keys array specifies a data kind, and the
+ * corresponding element in the values array receives the result.
+ *
+ * Processing stops at the first error; on success out_written
+ * is set to count, on error it is set to the index of the
+ * failing key (i.e. the number of values successfully written).
+ *
+ * @param state The render state handle (NULL returns GHOSTTY_INVALID_VALUE)
+ * @param count Number of key/value pairs
+ * @param keys Array of data kinds to query
+ * @param values Array of output pointers (types must match each key's
+ *               documented output type)
+ * @param[out] out_written On return, receives the number of values
+ *             successfully written (may be NULL)
+ * @return GHOSTTY_SUCCESS if all queries succeed
+ *
+ * @ingroup render
+ */
+GHOSTTY_API GhosttyResult ghostty_render_state_get_multi(
+    GhosttyRenderState state,
+    size_t count,
+    const GhosttyRenderStateData* keys,
+    void** values,
+    size_t* out_written);
 
 /**
  * Set an option on a render state.
@@ -364,7 +377,7 @@ GhosttyResult ghostty_render_state_get(GhosttyRenderState state,
  *
  * @ingroup render
  */
-GhosttyResult ghostty_render_state_set(GhosttyRenderState state,
+GHOSTTY_API GhosttyResult ghostty_render_state_set(GhosttyRenderState state,
                                        GhosttyRenderStateOption option,
                                        const void* value);
 
@@ -383,7 +396,7 @@ GhosttyResult ghostty_render_state_set(GhosttyRenderState state,
  *
  * @ingroup render
  */
-GhosttyResult ghostty_render_state_colors_get(GhosttyRenderState state,
+GHOSTTY_API GhosttyResult ghostty_render_state_colors_get(GhosttyRenderState state,
                                               GhosttyRenderStateColors* out_colors);
 
 /**
@@ -400,7 +413,7 @@ GhosttyResult ghostty_render_state_colors_get(GhosttyRenderState state,
  *
  * @ingroup render
  */
-GhosttyResult ghostty_render_state_row_iterator_new(
+GHOSTTY_API GhosttyResult ghostty_render_state_row_iterator_new(
     const GhosttyAllocator* allocator,
     GhosttyRenderStateRowIterator* out_iterator);
 
@@ -411,7 +424,7 @@ GhosttyResult ghostty_render_state_row_iterator_new(
  *
  * @ingroup render
  */
-void ghostty_render_state_row_iterator_free(GhosttyRenderStateRowIterator iterator);
+GHOSTTY_API void ghostty_render_state_row_iterator_free(GhosttyRenderStateRowIterator iterator);
 
 /**
  * Move a render-state row iterator to the next row.
@@ -425,7 +438,7 @@ void ghostty_render_state_row_iterator_free(GhosttyRenderStateRowIterator iterat
  *
  * @ingroup render
  */
-bool ghostty_render_state_row_iterator_next(GhosttyRenderStateRowIterator iterator);
+GHOSTTY_API bool ghostty_render_state_row_iterator_next(GhosttyRenderStateRowIterator iterator);
 
 /**
  * Get a value from the current row in a render-state row iterator.
@@ -443,10 +456,38 @@ bool ghostty_render_state_row_iterator_next(GhosttyRenderStateRowIterator iterat
  *
  * @ingroup render
  */
-GhosttyResult ghostty_render_state_row_get(
+GHOSTTY_API GhosttyResult ghostty_render_state_row_get(
     GhosttyRenderStateRowIterator iterator,
     GhosttyRenderStateRowData data,
     void* out);
+
+/**
+ * Get multiple data fields from the current row in a single call.
+ *
+ * Each element in the keys array specifies a data kind, and the
+ * corresponding element in the values array receives the result.
+ *
+ * Processing stops at the first error; on success out_written
+ * is set to count, on error it is set to the index of the
+ * failing key (i.e. the number of values successfully written).
+ *
+ * @param iterator The iterator handle (NULL returns GHOSTTY_INVALID_VALUE)
+ * @param count Number of key/value pairs
+ * @param keys Array of data kinds to query
+ * @param values Array of output pointers (types must match each key's
+ *               documented output type)
+ * @param[out] out_written On return, receives the number of values
+ *             successfully written (may be NULL)
+ * @return GHOSTTY_SUCCESS if all queries succeed
+ *
+ * @ingroup render
+ */
+GHOSTTY_API GhosttyResult ghostty_render_state_row_get_multi(
+    GhosttyRenderStateRowIterator iterator,
+    size_t count,
+    const GhosttyRenderStateRowData* keys,
+    void** values,
+    size_t* out_written);
 
 /**
  * Set an option on the current row in a render-state row iterator.
@@ -465,7 +506,7 @@ GhosttyResult ghostty_render_state_row_get(
  *
  * @ingroup render
  */
-GhosttyResult ghostty_render_state_row_set(
+GHOSTTY_API GhosttyResult ghostty_render_state_row_set(
     GhosttyRenderStateRowIterator iterator,
     GhosttyRenderStateRowOption option,
     const void* value);
@@ -487,7 +528,7 @@ GhosttyResult ghostty_render_state_row_set(
  *
  * @ingroup render
  */
-GhosttyResult ghostty_render_state_row_cells_new(
+GHOSTTY_API GhosttyResult ghostty_render_state_row_cells_new(
     const GhosttyAllocator* allocator,
     GhosttyRenderStateRowCells* out_cells);
 
@@ -496,7 +537,7 @@ GhosttyResult ghostty_render_state_row_cells_new(
  *
  * @ingroup render
  */
-typedef enum {
+typedef enum GHOSTTY_ENUM_TYPED {
   /** Invalid / sentinel value. */
   GHOSTTY_RENDER_STATE_ROW_CELLS_DATA_INVALID = 0,
 
@@ -530,6 +571,7 @@ typedef enum {
    *  color, in which case the caller should use whatever default foreground
    *  color it wants (e.g. the terminal foreground). */
   GHOSTTY_RENDER_STATE_ROW_CELLS_DATA_FG_COLOR = 6,
+  GHOSTTY_RENDER_STATE_ROW_CELLS_DATA_MAX_VALUE = GHOSTTY_ENUM_MAX_VALUE,
 } GhosttyRenderStateRowCellsData;
 
 /**
@@ -544,7 +586,7 @@ typedef enum {
  *
  * @ingroup render
  */
-bool ghostty_render_state_row_cells_next(GhosttyRenderStateRowCells cells);
+GHOSTTY_API bool ghostty_render_state_row_cells_next(GhosttyRenderStateRowCells cells);
 
 /**
  * Move a render-state row cells iterator to a specific column.
@@ -560,7 +602,7 @@ bool ghostty_render_state_row_cells_next(GhosttyRenderStateRowCells cells);
  *
  * @ingroup render
  */
-GhosttyResult ghostty_render_state_row_cells_select(
+GHOSTTY_API GhosttyResult ghostty_render_state_row_cells_select(
     GhosttyRenderStateRowCells cells, uint16_t x);
 
 /**
@@ -580,10 +622,38 @@ GhosttyResult ghostty_render_state_row_cells_select(
  *
  * @ingroup render
  */
-GhosttyResult ghostty_render_state_row_cells_get(
+GHOSTTY_API GhosttyResult ghostty_render_state_row_cells_get(
     GhosttyRenderStateRowCells cells,
     GhosttyRenderStateRowCellsData data,
     void* out);
+
+/**
+ * Get multiple data fields from the current cell in a single call.
+ *
+ * Each element in the keys array specifies a data kind, and the
+ * corresponding element in the values array receives the result.
+ *
+ * Processing stops at the first error; on success out_written
+ * is set to count, on error it is set to the index of the
+ * failing key (i.e. the number of values successfully written).
+ *
+ * @param cells The row cells handle (NULL returns GHOSTTY_INVALID_VALUE)
+ * @param count Number of key/value pairs
+ * @param keys Array of data kinds to query
+ * @param values Array of output pointers (types must match each key's
+ *               documented output type)
+ * @param[out] out_written On return, receives the number of values
+ *             successfully written (may be NULL)
+ * @return GHOSTTY_SUCCESS if all queries succeed
+ *
+ * @ingroup render
+ */
+GHOSTTY_API GhosttyResult ghostty_render_state_row_cells_get_multi(
+    GhosttyRenderStateRowCells cells,
+    size_t count,
+    const GhosttyRenderStateRowCellsData* keys,
+    void** values,
+    size_t* out_written);
 
 /**
  * Free a row cells instance.
@@ -592,7 +662,7 @@ GhosttyResult ghostty_render_state_row_cells_get(
  *
  * @ingroup render
  */
-void ghostty_render_state_row_cells_free(GhosttyRenderStateRowCells cells);
+GHOSTTY_API void ghostty_render_state_row_cells_free(GhosttyRenderStateRowCells cells);
 
 /** @} */
 
