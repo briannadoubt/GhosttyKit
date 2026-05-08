@@ -48,6 +48,28 @@ jobs:
       - name: Regenerate vendored libghostty
         run: ./Scripts/update-libghostty.sh
 
+      - name: Test CI helper scripts
+        run: |
+          bash Tests/Scripts/find-ghosttykit-static-library-test.sh
+          bash Tests/Scripts/install-zig-from-ghostty-test.sh
+          bash Tests/Scripts/update-libghostty-test.sh
+
+      - name: Verify package is publishable
+        run: |
+          if swift package dump-package | grep -q '"unsafeFlags"'; then
+            echo "Package.swift still uses unsafe build flags." >&2
+            exit 1
+          fi
+
+      - name: Verify vendored libghostty metadata
+        run: ./Scripts/check-libghostty-sync.sh
+
+      - name: Build package
+        run: swift build
+
+      - name: Run tests
+        run: swift test
+
       - name: Commit regenerated artifacts
         run: |
           git add Sources/GhosttyKit/include Vendor/GhosttyKit.xcframework.zip Vendor/GhosttyKit.checksum Vendor/libghostty.version
