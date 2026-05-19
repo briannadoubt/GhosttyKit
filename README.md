@@ -21,6 +21,41 @@ Then depend on the `GhosttyKit` product from your target.
 This package currently ships a macOS arm64 binary built with a minimum deployment
 target of macOS 13.
 
+## Default AppKit host
+
+For SwiftUI, drop in the ready-made view:
+
+```swift
+import GhosttyKit
+
+GhosttyTerminal()
+```
+
+For AppKit, ask a session for its hosted view:
+
+```swift
+import GhosttyKit
+
+let terminalView = GhosttyTerminalSession().makeView()
+```
+
+To try the bundled demo app:
+
+```sh
+swift run GhosttyKitDemo
+```
+
+`GhosttyTerminalView` installs the AppKit responder/text-input behavior that a
+terminal needs by default, including Delete/Return/arrow key handling without
+system beeps, copy/paste responder actions, mouse tracking, focus updates,
+backing-scale updates, link context-menu actions, cursor shape updates, config
+open/reload actions, title and working-directory state, search/progress/process
+state, secure-input bridging, size hints, tab/split request callbacks, desktop
+notification callbacks, config diagnostics, and standard pasteboard callbacks.
+The default host also loads the user's Ghostty config and, when no theme is
+configured, writes a small managed light/dark theme override so embedded
+terminals do not render as plain unstyled text.
+
 Downstream packages resolve the checked-in `Vendor/GhosttyKit.xcframework`
 through a local SwiftPM binary target, so the package stays consumable without
 unsafe build flags or remote artifact indirection.
