@@ -11,6 +11,10 @@ let package = Package(
         .library(
             name: "GhosttyKit",
             targets: ["GhosttyKit"]
+        ),
+        .executable(
+            name: "GhosttyKitDemo",
+            targets: ["GhosttyKitDemo"]
         )
     ],
     targets: [
@@ -32,6 +36,17 @@ let package = Package(
                 .linkedFramework("IOSurface"),
                 .linkedFramework("Metal"),
                 .linkedLibrary("c++"),
+            ]
+        ),
+        .executableTarget(
+            name: "GhosttyKitDemo",
+            dependencies: [
+                "GhosttyKit",
+            ],
+            path: "Sources/GhosttyKitDemo",
+            linkerSettings: [
+                .linkedFramework("AppKit"),
+                .linkedFramework("SwiftUI"),
             ]
         ),
         .testTarget(
