@@ -614,6 +614,19 @@ typedef enum GHOSTTY_ENUM_TYPED {
    *  GhosttyCell for renderers that only need to know whether fetching the
    *  full style is necessary. */
   GHOSTTY_RENDER_STATE_ROW_CELLS_DATA_HAS_STYLING = 8,
+
+  /**
+   * Encode the current cell's full grapheme cluster as UTF-8 into a
+   * caller-provided buffer (GhosttyBuffer).
+   *
+   * The base codepoint is encoded first, followed by any extra grapheme
+   * codepoints. Returns GHOSTTY_SUCCESS with len=0 when the cell has no text.
+   *
+   * If ptr is NULL or cap is too small for a non-empty cell, returns
+   * GHOSTTY_OUT_OF_SPACE without writing any bytes and sets len to the required
+   * buffer size in bytes.
+   */
+  GHOSTTY_RENDER_STATE_ROW_CELLS_DATA_GRAPHEMES_UTF8 = 9,
   GHOSTTY_RENDER_STATE_ROW_CELLS_DATA_MAX_VALUE = GHOSTTY_ENUM_MAX_VALUE,
 } GhosttyRenderStateRowCellsData;
 
