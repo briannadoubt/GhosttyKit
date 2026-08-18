@@ -366,6 +366,7 @@ public final class GhosttyTerminalSession {
     public var notificationHandler: ((GhosttyTerminalNotification) -> Void)?
     public var requestHandler: ((GhosttyTerminalRequest) -> Void)?
     nonisolated(unsafe) private var secureEventInputEnabled = false
+    private var isDisposed = false
 
     public init(
         host: any GhosttyTerminalHostProtocol = GhosttyTerminalHost.shared ?? (try! GhosttyTerminalHost()),
@@ -386,6 +387,30 @@ public final class GhosttyTerminalSession {
         }
     }
 
+    /// Permanently releases the native surface and its process while allowing the session
+    /// object to outlive the AppKit view hierarchy that retained it.
+    public func dispose() {
+        guard !isDisposed else { return }
+        isDisposed = true
+
+        view?.handlers = nil
+        view = nil
+        closeHandler = nil
+        actionHandler = nil
+        notificationHandler = nil
+        requestHandler = nil
+
+        if secureEventInputEnabled {
+            DisableSecureEventInput()
+            secureEventInputEnabled = false
+        }
+        if let surface {
+            self.surface = nil
+            ghostty_surface_free(surface)
+        }
+        host.unregister(self)
+    }
+
     public func makeView(configuration viewConfiguration: GhosttyTerminalViewConfiguration = .default) -> GhosttyTerminalView {
         let view = GhosttyTerminalView(configuration: viewConfiguration)
         view.handlers = makeViewHandlers()
@@ -394,6 +419,7 @@ public final class GhosttyTerminalSession {
     }
 
     public func attach(to view: GhosttyTerminalView) {
+        guard !isDisposed else { return }
         self.view = view
         if view.handlers == nil {
             view.handlers = makeViewHandlers()

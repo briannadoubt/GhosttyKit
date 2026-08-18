@@ -155,6 +155,24 @@ final class GhosttyKitTests: XCTestCase {
         XCTAssertEqual(session.state.configDiagnostics, [GhosttyTerminalConfigDiagnostic(message: "bad config")])
     }
 
+    @MainActor
+    func testTerminalSessionDisposalIsExplicitAndIdempotent() {
+        let host = RecordingGhosttyHost()
+        let session = GhosttyTerminalSession(host: host, configuration: .init())
+        let view = session.makeView()
+
+        XCTAssertEqual(host.registerCount, 1)
+        XCTAssertNotNil(view.handlers)
+
+        session.dispose()
+        session.dispose()
+
+        XCTAssertNil(session.surface)
+        XCTAssertNil(session.view)
+        XCTAssertNil(view.handlers)
+        XCTAssertEqual(host.unregisterCount, 1)
+    }
+
     func testDefaultThemeOverrideWritesLightDarkThemePair() throws {
         let directoryURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("ghosttykit-theme-\(UUID().uuidString)", isDirectory: true)
@@ -228,9 +246,11 @@ private final class RecordingGhosttyHost: GhosttyTerminalHostProtocol {
     var app: ghostty_app_t? { nil }
     var config: ghostty_config_t? { nil }
     var configDiagnostics: [GhosttyTerminalConfigDiagnostic] = []
+    var registerCount = 0
+    var unregisterCount = 0
 
-    func register(_ session: GhosttyTerminalSession) {}
-    func unregister(_ session: GhosttyTerminalSession) {}
+    func register(_ session: GhosttyTerminalSession) { registerCount += 1 }
+    func unregister(_ session: GhosttyTerminalSession) { unregisterCount += 1 }
     func tick() {}
     func reloadConfig() {}
     func openConfig() {}
